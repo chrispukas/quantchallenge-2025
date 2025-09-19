@@ -1,7 +1,0 @@
-README.md
-pyproject.toml
-qch.egg-info/PKG-INFO
-qch.egg-info/SOURCES.txt
-qch.egg-info/dependency_links.txt
-qch.egg-info/top_level.txt
-qch2025/trading/template.py
