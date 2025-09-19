@@ -49,21 +49,45 @@ def train(model: nn.RNN,
             )
             output = torch.stack(output).permute(1, 0)
 
-
             pred_out = model.forward(input)
             loss = cr(pred_out, output)
             
-            optimizer.zero_grad()
             loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), 3)
             optimizer.step()
+            optimizer.zero_grad()
 
         all_loss.append(loss.item()/len(batch))
         print(f"{ep}: avg loss = {all_loss[-1]}")
     return all_loss   
 
 
-def eval():
-    pass
+def eval(model: nn.RNN,
+         dataset: Dataset):
+    with torch.no_grad():
+        all = dataset.dataset
+        (ids, t, a, b, c, d, e, f, g, h, i, j, k, l, m, n) = zip(*all)
+
+        input = (
+            torch.tensor(a).to(model.device, dtype=torch.float32),
+            torch.tensor(b).to(model.device, dtype=torch.float32),
+            torch.tensor(c).to(model.device, dtype=torch.float32),
+            torch.tensor(d).to(model.device, dtype=torch.float32),
+            torch.tensor(e).to(model.device, dtype=torch.float32),
+            torch.tensor(f).to(model.device, dtype=torch.float32),
+            torch.tensor(g).to(model.device, dtype=torch.float32),
+            torch.tensor(h).to(model.device, dtype=torch.float32),
+            torch.tensor(i).to(model.device, dtype=torch.float32),
+            torch.tensor(j).to(model.device, dtype=torch.float32),
+            torch.tensor(k).to(model.device, dtype=torch.float32),
+            torch.tensor(l).to(model.device, dtype=torch.float32),
+            torch.tensor(m).to(model.device, dtype=torch.float32),
+            torch.tensor(n).to(model.device, dtype=torch.float32),
+        )
+        input = torch.stack(input).permute(1, 0)
+        preds = model.forward(input)
+    
+    return preds.detach().cpu().numpy(), ids
         
 
 

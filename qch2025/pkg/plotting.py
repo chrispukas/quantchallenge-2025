@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 def plot_scatter(x: list[float],
                 y: list[float],
@@ -28,6 +29,11 @@ def plot_line(x: list[float],
     plt.xlabel(xlabel=x_label)
     plt.ylabel(ylabel=y_label)
 
-    plt.ylim([0, 0.02])
-
     plt.show()
+
+
+def get_rsq(y_pred: list, y_true: list):
+    rss = np.sum((y_true - y_pred) ** 2)
+    tss = np.sum((y_true - np.mean(y_true)) ** 2)
+
+    return 1 - rss/tss
