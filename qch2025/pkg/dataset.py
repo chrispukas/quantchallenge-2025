@@ -12,9 +12,16 @@ class DS(Dataset):
                  eval: bool = False,
                  device: torch.device=torch.device("cuda"),
                  dtype: torch.dtype=torch.float16) -> None:
+        
         self.device = device
-        self.entries = pd.read_csv(dataset_path)
+        self.df = pd.read_csv(dataset_path)
         self.eval = eval
+        
+        mean = self.entries[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M']].mean(skipna=True)
+        std = self.entries[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M']].std()
+
+        self.entries = (self.entries - mean) / std # Normalizes the dataset
+
 
         if eval:
             print("Evaluation mode activated, created training items")
@@ -43,6 +50,9 @@ class DS(Dataset):
             torch.tensor(self.entries['Y1']).to(self.device, dtype=dtype),
             torch.tensor(self.entries['Y2']).to(self.device, dtype=dtype),
         )).to(self.device).transpose(1,0)
+
+        print(train.shape) # [batch_size, window_length, features]
+        print(tar.shape) # [batch_size, window_length, features]
 
         it = int(train.shape[0]*0.9)
 

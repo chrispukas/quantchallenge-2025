@@ -27,11 +27,7 @@ def train(model: nn.RNN,
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True) # Each batch item is its own sliding window
         losses=[]
         t = time.datetime.now()
-        print(len(loader))
         for i, (tr, target) in enumerate(loader):
-            tr = tr.squeeze(0)
-            target = target.squeeze(0)
-
             pred_out = model.forward(tr)
             loss = cr(pred_out, target)
             
@@ -44,18 +40,17 @@ def train(model: nn.RNN,
                 losses.append(loss.item())
                 s_1, d_1 = sum(losses), len(losses)
                 print(f"[{time.datetime.now()}] Current batch item: {i}, took {int((time.datetime.now()-t).total_seconds()*1000)} ms, loss: {loss.item()}, mean loss: {(s_1)/d_1}")
-                
-                m = min(losses) if len(losses) > 0 else 0
-                if loss.item() < m:
-                    print("Saving checkpoint")
-                    torch.save({
-                        'model_state_dict': model.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
-                    }, "/home/ubuntu/repos/quantchallenge-2025/weights/weights.pth")
-                    # Only save weights with best rsq
                 t = time.datetime.now()
-        
+
         rsq = check_training(model, dataset)
+        m = max(rolling_mean) if len(rolling_mean) > 0 else 0
+        if rsq > m:
+            print(f"Saving checkpoint: best rsq: {rsq} vs current: {m}")
+            torch.save({
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+            }, "/home/ubuntu/repos/quantchallenge-2025/weights/weights.pth")
+            # Only save weights with best rsq
         rolling_mean.append(rsq)
 
         print(f"{ep}: loss mean = {rolling_mean[-1]}, RSQ: {rsq}")
@@ -66,12 +61,14 @@ def train(model: nn.RNN,
 
 def check_training(model: nn.RNN, dataset: DS):
     with torch.no_grad():
-        preds = model.forward(dataset.eval_train)
-        y1_p = preds[:, 0].detach().cpu().numpy()
-        y2_p = preds[:, 1].detach().cpu().numpy()
+        preds = model.forward(dataset.eval_train).detach().cpu().numpy()
+        eval = dataset.eval_targets.detach().cpu().numpy()
 
-        y1_t = dataset.eval_targets[:, 0].detach().cpu().numpy()
-        y2_t = dataset.eval_targets[:, 1].detach().cpu().numpy()
+        y1_p = preds[:, 0]
+        y2_p = preds[:, 1]
+
+        y1_t = eval[:, 0]
+        y2_t = eval[:, 1]
 
         r1 = r2_score(y1_t, y1_p)
         r2 = r2_score(y2_t, y2_p)
@@ -85,7 +82,7 @@ def eval(model: nn.RNN,
          dataset: DS,
          batch_size: int=1):
     with torch.no_grad():
-        loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+        loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
         y1, y2 = {}, {}
         for i, (tr) in enumerate(loader):
             pred = model.forward(tr)
