@@ -24,9 +24,6 @@ class DS(Dataset):
         self.std[self.std==0] = 1 # Clear constant std variables
 
         self.entries = (self.df - self.mean) / self.std # Normalizes the dataset
-
-        print(self.entries.head(), self.df.head())
-
         if eval:
             print("Evaluation mode activated, created training items")
 

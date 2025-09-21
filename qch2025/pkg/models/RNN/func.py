@@ -20,7 +20,8 @@ def train(model: nn.RNN,
 
     model.train()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    cr = nn.MSELoss()
+
+    decay = torch.tensor([0.2]).to(device=model.device, dtype=torch.float32)
 
     for ep in range(1, epochs+1):
         model.zero_grad()
@@ -29,7 +30,7 @@ def train(model: nn.RNN,
         t = time.datetime.now()
         for i, (tr, target) in enumerate(loader):
             pred_out = model.forward(tr)
-            loss = cr(pred_out, target)
+            loss = combined_loss(pred_out, target, alpha_decay=decay)
             
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 3)
@@ -114,3 +115,28 @@ def eval(model: nn.RNN,
 
 
     
+
+
+def combined_loss(preds: torch.Tensor, actual: torch.Tensor, alpha_decay: torch.Tensor):
+    pred_flatten = preds.reshape(-1, 2) # Collapses [points, features]
+    actual_flatten = actual.reshape(-1, 2)
+
+    print(pred_flatten.shape, actual_flatten.shape)
+
+    mse = torch.mean((pred_flatten-actual_flatten)**2)
+    print(mse.shape)
+
+    mean_true = torch.mean(actual_flatten, dim=0) # Return tensor of size [features]
+    ss_res = torch.sum((pred_flatten-actual_flatten)**2, dim=0) # Tensor of size [features]
+    ss_tot = torch.sum((actual_flatten-mean_true)**2)
+
+    print(mean_true.shape, ss_res.shape, ss_tot.shape)
+
+    r2 = torch.ones_like(ss_res) - (ss_res/ss_tot)
+    r2_final = torch.mean(r2)
+
+    comb = mse - alpha_decay.add_(r2_final)
+
+    print(comb.shape, comb)
+
+    return comb
