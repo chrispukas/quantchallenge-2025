@@ -10,10 +10,11 @@ class DS(Dataset):
                  window_size: int,
                  window_steps: int,
                  eval: bool = False,
-                 device: torch.device=torch.device("mps"),
+                 device: torch.device=torch.device("cuda"),
                  dtype: torch.dtype=torch.float16) -> None:
         self.device = device
         self.entries = pd.read_csv(dataset_path)
+        self.eval = eval
 
         if eval:
             print("Evaluation mode activated, created training items")
@@ -21,18 +22,35 @@ class DS(Dataset):
             self.ids = torch.tensor(self.entries["id"]).to(self.device, dtype=dtype)
             self.train = torch.tensor(self.entries.drop(["id", "time"], axis = 1)\
                                   .values.astype(np.float32)).to(self.device, dtype=dtype)
-            
+
+            n, f = self.train.shape
+            self.m = int((n-window_size)/window_steps)
+
+            train_stack = []
+
+            for i in range(self.m): 
+                l, r = i*window_steps, (i*window_steps)+window_size
+                train_stack.append(self.train[l:r, :])
+
+            self.window_train = torch.stack(train_stack).to(device=self.device, dtype=dtype)
+                
 
             return
         
-        self.train = torch.tensor(self.entries.drop(['Y1', "Y2", "time"], axis = 1)\
+        train = torch.tensor(self.entries.drop(['Y1', "Y2", "time"], axis = 1)\
                                   .values.astype(np.float32)).to(self.device, dtype=dtype)
-        
-        self.train_targets = torch.stack((
+        tar = torch.stack((
             torch.tensor(self.entries['Y1']).to(self.device, dtype=dtype),
             torch.tensor(self.entries['Y2']).to(self.device, dtype=dtype),
         )).to(self.device).transpose(1,0)
 
+        it = int(train.shape[0]*0.9)
+
+        self.train = train[:it ,...]
+        self.train_targets = tar[:it ,...]
+
+        self.eval_train = train[it: ,...]
+        self.eval_targets = tar[it: ,...]
 
         n, f = self.train_targets.shape
         ft, nt = self.train.shape
@@ -55,7 +73,10 @@ class DS(Dataset):
         return self.window_train.shape[0]
     
     def __getitem__(self, idx):
-        return self.window_train[idx], self.windows_targets[idx] # Training tensor for dataloader
+        if self.eval:
+            return self.window_train[idx]
+        else:
+            return self.window_train[idx], self.windows_targets[idx] # Training tensor for dataloader
     
     
     
