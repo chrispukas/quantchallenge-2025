@@ -102,7 +102,7 @@ def eval(model: nn.RNN,
             preds_total.append(pred)
         
         final = torch.cat(preds_total).to(device=model.device, dtype=torch.float32)
-        print(final.shape, dataset.)
+        print(final.shape, dataset.window_train.shape)
     return final.detach().cpu().numpy()
         
 

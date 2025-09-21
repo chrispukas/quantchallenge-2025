@@ -18,9 +18,6 @@ class DS(Dataset):
         self.df = self.df.drop(["time"], axis=1)
         self.eval = eval
 
-        t = torch.linspace(0, 1, steps=len(self.df["A"])).to(self.device, dtype=dtype).unsqueeze(-1)
-        print(t.shape)
-
         if eval:
             
             self.mean = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N"]].mean(skipna=True)
@@ -34,11 +31,6 @@ class DS(Dataset):
             self.ids = torch.tensor(self.entries["id"]).to(self.device, dtype=dtype)
             self.train = torch.tensor(self.entries.drop(["id"], axis = 1)\
                                   .values.astype(np.float32)).to(self.device, dtype=dtype)
-            
-            self.train = torch.cat((
-                t,
-                self.train
-            ), dim=-1)
 
             n, f = self.train.shape
             self.m = int((n-window_size)/window_steps)
@@ -75,11 +67,6 @@ class DS(Dataset):
         print(tar.shape) # [points, features]
 
         it = int(train.shape[0]*1)
-
-        train = torch.cat((
-            t,
-            train
-        ), dim=-1)
 
         self.train = train[: ,...]
         self.train_targets = tar[: ,...]
