@@ -13,16 +13,15 @@ from qch2025.pkg.dataset import DS
 
 def train(model: nn.RNN,
           dataset: DS,
-          epochs: int=5,
-          batch_size: int=32,
+          epochs: int = 5,
+          batch_size: int = 32,
+          decay: float = 0.1,
           learning_rate: float=0.001):
     rolling_mean: list[int] = []
 
     model.train()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
-    decay = torch.tensor([0.2]).to(device=model.device, dtype=torch.float32)
-
+    
     for ep in range(1, epochs+1):
         model.zero_grad()
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True) # Each batch item is its own sliding window
@@ -118,25 +117,17 @@ def eval(model: nn.RNN,
 
 
 def combined_loss(preds: torch.Tensor, actual: torch.Tensor, alpha_decay: torch.Tensor):
-    pred_flatten = preds.reshape(-1, 2) # Collapses [points, features]
-    actual_flatten = actual.reshape(-1, 2)
+    offset = 0.000001
 
-    print(pred_flatten.shape, actual_flatten.shape)
+    mse = torch.mean(torch.mean((preds-actual)**2, dim=-1)) # Combined mean to take in batch structure
 
-    mse = torch.mean((pred_flatten-actual_flatten)**2)
-    print(mse.shape)
+    mean_true = torch.mean(actual, dim=(0,1)) # Return tensor of size [features]
+    ss_res = torch.sum((preds-actual)**2, dim=(0,1)) # Tensor of size [features]
+    ss_tot = torch.sum((actual-mean_true)**2, dim=(0,1))
 
-    mean_true = torch.mean(actual_flatten, dim=0) # Return tensor of size [features]
-    ss_res = torch.sum((pred_flatten-actual_flatten)**2, dim=0) # Tensor of size [features]
-    ss_tot = torch.sum((actual_flatten-mean_true)**2)
-
-    print(mean_true.shape, ss_res.shape, ss_tot.shape)
-
-    r2 = torch.ones_like(ss_res) - (ss_res/ss_tot)
+    r2 = 1 - (ss_res/(ss_tot + offset))
     r2_final = torch.mean(r2)
 
-    comb = mse - alpha_decay.add_(r2_final)
-
-    print(comb.shape, comb)
+    comb = mse - (alpha_decay * r2_final)
 
     return comb
