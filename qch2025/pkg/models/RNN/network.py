@@ -14,11 +14,13 @@ class RNN(nn.Module):
                  dtype: torch.dtype=torch.float16) -> None:
         super(RNN, self).__init__()
         self.lstm = nn.LSTM(input_size, hidden_size=hidden_size, num_layers=layers, dropout=dropout, bidirectional=True, batch_first=True).to(device=device, dtype=dtype)
-        self.fc = nn.Linear(in_features=hidden_size*2, out_features=output_size).to(device=device, dtype=dtype)
         self.norm_1 = nn.LayerNorm(hidden_size*2).to(device=device, dtype=dtype)
         
         self.attn = nn.MultiheadAttention(hidden_size*2, heads, batch_first=True).to(device=device, dtype=dtype)
         self.norm_2 = nn.LayerNorm(hidden_size*2).to(device=device, dtype=dtype)
+
+        self.fc = nn.Linear(in_features=hidden_size*2, out_features=output_size).to(device=device, dtype=dtype)
+
         self.device = device
     
     def forward(self, x):

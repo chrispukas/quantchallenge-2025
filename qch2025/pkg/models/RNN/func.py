@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import datetime as time
-from sklearn.metrics import r2_score
+#from sklearn.metrics import r2_score
 
 import numpy as np
 
@@ -30,38 +30,47 @@ def train(model: nn.RNN,
         t = time.datetime.now()
         for i, (tr, target) in enumerate(loader):
             pred_out = model.forward(tr)
-            loss = combined_loss(pred_out, target, alpha_decay=decay)
-            #loss = cr(pred_out, target)
+            #loss = combined_loss(pred_out, target, alpha_decay=decay)
+            loss = cr(pred_out, target)
             
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 3)
             optimizer.step()
             optimizer.zero_grad()
 
+            losses.append(loss.item())
+
             if i % 250 == 0:
-                losses.append(loss.item())
-                s_1, d_1 = sum(losses), len(losses)
-                print(f"[{time.datetime.now()}] Current batch item: {i}, took {int((time.datetime.now()-t).total_seconds()*1000)} ms, loss: {loss.item()}, mean loss: {(s_1)/d_1}")
+                print(f"[{time.datetime.now()}] Current batch item: {i}, took {int((time.datetime.now()-t).total_seconds()*1000)} ms, current loss: {losses[-1]}, mean loss: {np.mean(np.array(losses))}")
                 t = time.datetime.now()
 
-        rsq, acc = check_training(model, dataset)
-        if rsq > mx and ep > 3:
-            print(f"Saving checkpoint: best rsq: {rsq} vs current: {m}")
-            torch.save({
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-            }, "/home/ubuntu/repos/quantchallenge-2025/weights/weights.pth")
-            # Only save weights with best rsq
-            mx = max(mx, rsq)
-        rolling_mean.append(rsq)
+        torch.save({
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+        }, "/home/ubuntu/repos/quantchallenge-2025/weights/weights.pth")
 
-        print(f"{ep}: RSQ: {rsq}, accuracy: {(acc*100):.2f}%")
+        """
+            rsq, acc = check_training(model, dataset)
+            if rsq > mx and ep > 3:
+                print(f"Saving checkpoint: best rsq: {rsq} vs current: {m}")
+                torch.save({
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                }, "/home/ubuntu/repos/quantchallenge-2025/weights/weights.pth")
+                # Only save weights with best rsq
+                mx = max(mx, rsq)
+            rolling_mean.append(rsq)
+        """
+
+        print(f"{ep}: AVG OVERALL LOSS: {np.mean(np.array(losses))}, FINAL LOSS: {losses[-1]}, SMALLEST LOSS {min(losses)}, LARGEST LOSS: {max(losses)}")
     return rolling_mean   
 
 
 
 
 def check_training(model: nn.RNN, dataset: DS):
+    return 0, 0
+
     with torch.no_grad():
         preds = model.forward(dataset.eval_train).detach().cpu().numpy()
         eval = dataset.eval_targets.detach().cpu().numpy()
@@ -87,29 +96,14 @@ def eval(model: nn.RNN,
          batch_size: int=1):
     with torch.no_grad():
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
-        y1, y2 = {}, {}
+        preds_total = []
         for i, (tr) in enumerate(loader):
             pred = model.forward(tr)
-            pred = pred.detach().cpu().numpy()
-
-            for j, elem in enumerate(pred):
-                idx = i+j
-                if idx in y1:
-                    y1[idx].append(elem[0])
-                    y2[idx].append(elem[1])
-                else:
-                    y1[idx] = [elem[0]]
-                    y2[idx] = [elem[1]]
+            preds_total.append(pred)
         
-        y1_f, y2_f, ids = np.zeros(len(y1)), np.zeros(len(y2)), []
-        for i, v in enumerate(y1.values()):
-            y1_f[i] = np.mean(v)
-            ids.append(i)
-
-        for i, v in enumerate(y2.values()):
-            y2_f[i] = np.mean(v)
-    
-    return y1_f, y2_f, ids
+        final = torch.cat(preds_total).to(device=model.device, dtype=torch.float32)
+        print(final.shape, dataset.)
+    return final.detach().cpu().numpy()
         
 
 

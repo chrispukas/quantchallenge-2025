@@ -74,15 +74,15 @@ class DS(Dataset):
         print(train.shape) # [points, features]
         print(tar.shape) # [points, features]
 
-        it = int(train.shape[0]*0.9)
+        it = int(train.shape[0]*1)
 
         train = torch.cat((
             t,
             train
         ), dim=-1)
 
-        self.train = train[:it ,...]
-        self.train_targets = tar[:it ,...]
+        self.train = train[: ,...]
+        self.train_targets = tar[: ,...]
 
         self.eval_train = train[it: ,...]
         self.eval_targets = tar[it: ,...]
