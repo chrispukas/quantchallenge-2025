@@ -22,13 +22,22 @@ class DS(Dataset):
 
         # Feature generation:
 
-        # Lagged
 
+        cols_to_normalize = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "O", "P"]
+        cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "O", "P"]
 
+        features = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N"]
+        for feature in features:
+            params = [f"{feature}_diff", f"{feature}_pos", f"{feature}_neg"]
+            self.df[f"{feature}_diff"] = self.df[feature].diff().fillna(0)
+            
+            self.df[f"{feature}_pos"] = (self.df[feature] > 0).astype(int)
+            self.df[f"{feature}_neg"] = (self.df[feature] < 0).astype(int)
+
+            cols.extend(params)
+            cols_to_normalize.append(f"{feature}_diff")
 
         self.eval = eval
-
-        cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "O", "P"]
 
         if eval:
             
@@ -65,12 +74,16 @@ class DS(Dataset):
 
             return
 
-        self.mean = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "O", "P", "Y1", "Y2"]].mean(skipna=True)
-        self.std = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "O", "P", 'Y1', "Y2"]].std()
+        self.mean = self.df[cols_to_normalize].mean(skipna=True)
+        self.std = self.df[cols_to_normalize].std()
 
         self.std[self.std==0] = 1 # Clear constant std variables
 
-        self.entries = (self.df - self.mean) / self.std # Normalizes the dataset
+        self.entries = self.df.copy(deep=True)
+        self.entries[cols_to_normalize] = (self.df[cols_to_normalize] - self.mean) / self.std # Normalizes the dataset
+
+        print(self.entries.head())
+        print(self.entries.columns)
         
         self.entries["Y1"] = self.df["Y1"]
         self.entries["Y2"] = self.df["Y2"]
