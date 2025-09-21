@@ -17,19 +17,28 @@ class DS(Dataset):
         self.df = pd.read_csv(dataset_path)
         self.df = self.df.drop(["time"], axis=1)
         self.eval = eval
-        
-        self.mean = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "Y1", "Y2"]].mean(skipna=True)
-        self.std = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", 'Y1', "Y2"]].std()
 
-        self.std[self.std==0] = 1 # Clear constant std variables
+        t = torch.linspace(0, 1, steps=len(self.df["A"])).to(self.device, dtype=dtype).unsqueeze(-1)
+        print(t.shape)
 
-        self.entries = (self.df - self.mean) / self.std # Normalizes the dataset
         if eval:
+            
+            self.mean = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N"]].mean(skipna=True)
+            self.std = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N"]].std()
+
+            self.std[self.std==0] = 1 # Clear constant std variables
+
+            self.entries = (self.df - self.mean) / self.std # Normalizes the dataset
             print("Evaluation mode activated, created training items")
 
             self.ids = torch.tensor(self.entries["id"]).to(self.device, dtype=dtype)
             self.train = torch.tensor(self.entries.drop(["id"], axis = 1)\
                                   .values.astype(np.float32)).to(self.device, dtype=dtype)
+            
+            self.train = torch.cat((
+                t,
+                self.train
+            ), dim=-1)
 
             n, f = self.train.shape
             self.m = int((n-window_size)/window_steps)
@@ -44,7 +53,17 @@ class DS(Dataset):
                 
 
             return
+
+        self.mean = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "Y1", "Y2"]].mean(skipna=True)
+        self.std = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", 'Y1', "Y2"]].std()
+
+        self.std[self.std==0] = 1 # Clear constant std variables
+
+        self.entries = (self.df - self.mean) / self.std # Normalizes the dataset
         
+        self.entries["Y1"] = self.df["Y1"]
+        self.entries["Y2"] = self.df["Y2"]
+
         train = torch.tensor(self.entries.drop(['Y1', "Y2"], axis = 1)\
                                   .values.astype(np.float32)).to(self.device, dtype=dtype)
         tar = torch.stack((
@@ -52,10 +71,15 @@ class DS(Dataset):
             torch.tensor(self.entries['Y2']).to(self.device, dtype=dtype),
         )).to(self.device).transpose(1,0)
 
-        print(train.shape) # [batch_size, window_length, features]
-        print(tar.shape) # [batch_size, window_length, features]
+        print(train.shape) # [points, features]
+        print(tar.shape) # [points, features]
 
         it = int(train.shape[0]*0.9)
+
+        train = torch.cat((
+            t,
+            train
+        ), dim=-1)
 
         self.train = train[:it ,...]
         self.train_targets = tar[:it ,...]

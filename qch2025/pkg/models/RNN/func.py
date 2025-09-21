@@ -21,7 +21,8 @@ def train(model: nn.RNN,
 
     model.train()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    
+    cr = nn.MSELoss()
+    mx = 0
     for ep in range(1, epochs+1):
         model.zero_grad()
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True) # Each batch item is its own sliding window
@@ -30,6 +31,7 @@ def train(model: nn.RNN,
         for i, (tr, target) in enumerate(loader):
             pred_out = model.forward(tr)
             loss = combined_loss(pred_out, target, alpha_decay=decay)
+            #loss = cr(pred_out, target)
             
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 3)
@@ -42,18 +44,18 @@ def train(model: nn.RNN,
                 print(f"[{time.datetime.now()}] Current batch item: {i}, took {int((time.datetime.now()-t).total_seconds()*1000)} ms, loss: {loss.item()}, mean loss: {(s_1)/d_1}")
                 t = time.datetime.now()
 
-        rsq = check_training(model, dataset)
-        m = max(rolling_mean) if len(rolling_mean) > 0 else 0
-        if rsq > m:
+        rsq, acc = check_training(model, dataset)
+        if rsq > mx and ep > 3:
             print(f"Saving checkpoint: best rsq: {rsq} vs current: {m}")
             torch.save({
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
             }, "/home/ubuntu/repos/quantchallenge-2025/weights/weights.pth")
             # Only save weights with best rsq
+            mx = max(mx, rsq)
         rolling_mean.append(rsq)
 
-        print(f"{ep}: loss mean = {rolling_mean[-1]}, RSQ: {rsq}")
+        print(f"{ep}: RSQ: {rsq}, accuracy: {(acc*100):.2f}%")
     return rolling_mean   
 
 
@@ -65,15 +67,17 @@ def check_training(model: nn.RNN, dataset: DS):
         eval = dataset.eval_targets.detach().cpu().numpy()
 
         # Denormalize for evaluation
-        y1_p = preds[:, 0] * dataset.std["Y1"] + dataset.mean["Y1"]
-        y2_p = preds[:, 1] * dataset.std["Y2"] + dataset.mean["Y2"] 
+        y1_p = preds[:, 0]
+        y2_p = preds[:, 1]
 
-        y1_t = eval[:, 0] * dataset.std["Y1"] + dataset.mean["Y1"]
-        y2_t = eval[:, 1] * dataset.std["Y2"] + dataset.mean["Y2"]
+        y1_t = eval[:, 0]
+        y2_t = eval[:, 1]
 
         r1 = r2_score(y1_t, y1_p)
         r2 = r2_score(y2_t, y2_p)
-    return (r1+r2)/2
+
+        acc = np.mean(np.absolute(preds - eval) < 0.05)
+    return (r1+r2)/2, acc
 
 
 
@@ -82,7 +86,7 @@ def eval(model: nn.RNN,
          dataset: DS,
          batch_size: int=1):
     with torch.no_grad():
-        loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
+        loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
         y1, y2 = {}, {}
         for i, (tr) in enumerate(loader):
             pred = model.forward(tr)
@@ -105,9 +109,6 @@ def eval(model: nn.RNN,
         for i, v in enumerate(y2.values()):
             y2_f[i] = np.mean(v)
     
-    y1_f = y1_f * dataset.std["Y1"] + dataset.mean["Y1"]
-    y2_f = y2_f * dataset.std["Y2"] + dataset.mean["Y2"]
-    
     return y1_f, y2_f, ids
         
 
@@ -128,6 +129,6 @@ def combined_loss(preds: torch.Tensor, actual: torch.Tensor, alpha_decay: torch.
     r2 = 1 - (ss_res/(ss_tot + offset))
     r2_final = torch.mean(r2)
 
-    comb = mse - (alpha_decay * r2_final)
+    comb = mse + (alpha_decay * r2_final)
 
     return comb
