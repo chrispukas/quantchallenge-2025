@@ -64,15 +64,15 @@ def check_training(model: nn.RNN, dataset: DS):
         preds = model.forward(dataset.eval_train).detach().cpu().numpy()
         eval = dataset.eval_targets.detach().cpu().numpy()
 
-        y1_p = preds[:, 0]
-        y2_p = preds[:, 1]
+        # Denormalize for evaluation
+        y1_p = preds[:, 0] * dataset.std["Y1"] + dataset.mean["Y1"]
+        y2_p = preds[:, 1] * dataset.std["Y2"] + dataset.mean["Y2"] 
 
-        y1_t = eval[:, 0]
-        y2_t = eval[:, 1]
+        y1_t = eval[:, 0] * dataset.std["Y1"] + dataset.mean["Y1"]
+        y2_t = eval[:, 1] * dataset.std["Y2"] + dataset.mean["Y2"]
 
         r1 = r2_score(y1_t, y1_p)
         r2 = r2_score(y2_t, y2_p)
-        print(r1, r2)
     return (r1+r2)/2
 
 
@@ -104,6 +104,9 @@ def eval(model: nn.RNN,
 
         for i, v in enumerate(y2.values()):
             y2_f[i] = np.mean(v)
+    
+    y1_f = y1_f * dataset.std["Y1"] + dataset.mean["Y1"]
+    y2_f = y2_f * dataset.std["Y2"] + dataset.mean["Y2"]
     
     return y1_f, y2_f, ids
         

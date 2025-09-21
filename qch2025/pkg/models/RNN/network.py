@@ -20,11 +20,7 @@ class RNN(nn.Module):
         self.device = device
     
     def forward(self, x):
-        x = (x - torch.mean(x, dim=0))/torch.std(x, dim=0)
-
         out, _ = self.gru(x)
         out, _ = self.attn(out, out, out)
         out = self.fc(out)
-
-        x = x * torch.std(x, dim=0) + torch.mean(x, dim=0)
         return out

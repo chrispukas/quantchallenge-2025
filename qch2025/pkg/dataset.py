@@ -15,19 +15,23 @@ class DS(Dataset):
         
         self.device = device
         self.df = pd.read_csv(dataset_path)
+        self.df = self.df.drop(["time"], axis=1)
         self.eval = eval
         
-        mean = self.entries[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M']].mean(skipna=True)
-        std = self.entries[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M']].std()
+        self.mean = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "Y1", "Y2"]].mean(skipna=True)
+        self.std = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", 'Y1', "Y2"]].std()
 
-        self.entries = (self.entries - mean) / std # Normalizes the dataset
+        self.std[self.std==0] = 1 # Clear constant std variables
 
+        self.entries = (self.df - self.mean) / self.std # Normalizes the dataset
+
+        print(self.entries.head(), self.df.head())
 
         if eval:
             print("Evaluation mode activated, created training items")
 
             self.ids = torch.tensor(self.entries["id"]).to(self.device, dtype=dtype)
-            self.train = torch.tensor(self.entries.drop(["id", "time"], axis = 1)\
+            self.train = torch.tensor(self.entries.drop(["id"], axis = 1)\
                                   .values.astype(np.float32)).to(self.device, dtype=dtype)
 
             n, f = self.train.shape
@@ -44,7 +48,7 @@ class DS(Dataset):
 
             return
         
-        train = torch.tensor(self.entries.drop(['Y1', "Y2", "time"], axis = 1)\
+        train = torch.tensor(self.entries.drop(['Y1', "Y2"], axis = 1)\
                                   .values.astype(np.float32)).to(self.device, dtype=dtype)
         tar = torch.stack((
             torch.tensor(self.entries['Y1']).to(self.device, dtype=dtype),
