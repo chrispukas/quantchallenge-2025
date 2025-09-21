@@ -25,7 +25,7 @@ class RNN(nn.Module):
         out, _ = self.lstm(x)
         out = self.norm_1(out)
 
-        out, _ = self.attn(out, out, out)
+        out, _ = out + self.attn(out, out, out)
         out = self.norm_2(out)
         
         out = self.fc(out)
