@@ -7,6 +7,7 @@ from torch.utils.data import Dataset
 class DS(Dataset):
     def __init__(self, 
                  dataset_path: str,
+                 dataset_path_2: str,
                  window_size: int,
                  window_steps: int,
                  eval: bool = False,
@@ -15,13 +16,24 @@ class DS(Dataset):
         
         self.device = device
         self.df = pd.read_csv(dataset_path)
-        self.df = self.df.drop(["time"], axis=1)
+        df2 = pd.read_csv(dataset_path_2)
+        self.df = pd.concat([self.df.drop(["time"], axis=1), df2.fillna(0)], axis=1)
+        
+
+        # Feature generation:
+
+        # Lagged
+
+
+
         self.eval = eval
+
+        cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "O", "P"]
 
         if eval:
             
-            self.mean = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N"]].mean(skipna=True)
-            self.std = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N"]].std()
+            self.mean = self.df[cols].mean(skipna=True)
+            self.std = self.df[cols].std()
 
             self.std[self.std==0] = 1 # Clear constant std variables
 
@@ -37,17 +49,24 @@ class DS(Dataset):
 
             train_stack = []
 
-            for i in range(self.m): 
-                l, r = i*window_steps, (i*window_steps)+window_size
-                train_stack.append(self.train[l:r, :])
+            for l in range(0, n, window_steps): 
+                r = l + window_size
+                tr_slice = self.train[l:r, :]
+                if r > n:
+                    print(f"Out of range by: {r-n} items!" )
+                    pad_len = r-n
+                    pad_tr = tr_slice[-1:].repeat(pad_len, 1)
+                    tr_slice = torch.cat([tr_slice, pad_tr], dim=0)
+                
+                train_stack.append(tr_slice)
 
             self.window_train = torch.stack(train_stack).to(device=self.device, dtype=dtype)
                 
 
             return
 
-        self.mean = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "Y1", "Y2"]].mean(skipna=True)
-        self.std = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", 'Y1', "Y2"]].std()
+        self.mean = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "O", "P", "Y1", "Y2"]].mean(skipna=True)
+        self.std = self.df[['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "O", "P", 'Y1', "Y2"]].std()
 
         self.std[self.std==0] = 1 # Clear constant std variables
 
@@ -75,16 +94,24 @@ class DS(Dataset):
         self.eval_targets = tar[it: ,...]
 
         n, f = self.train_targets.shape
-        ft, nt = self.train.shape
-
-        self.m = int((n-window_size)/window_steps)
         train_stack, target_stack = [], []
 
+        for l in range(0, n, window_steps): 
+            r = l + window_size
+            tr_slice = self.train[l:r, :]
+            y_slice = self.train_targets[l:r, :]
+            
+            if r > n:
+                print(f"Out of range by: {r-n} items!" )
+                pad_len = r-n
+                pad_tr = tr_slice[-1:].repeat(pad_len, 1)
+                pad_y = y_slice[-1:].repeat(pad_len, 1)
 
-        for i in range(self.m): 
-            l, r = i*window_steps, (i*window_steps)+window_size
-            train_stack.append(self.train[l:r, :])
-            target_stack.append(self.train_targets[l:r, :])
+                tr_slice = torch.cat([tr_slice, pad_tr], dim=0)
+                y_slice = torch.cat([y_slice, pad_y], dim=0)
+            
+            train_stack.append(tr_slice)
+            target_stack.append(y_slice)
 
         self.window_train = torch.stack(train_stack).to(device=self.device, dtype=dtype)
         self.windows_targets = torch.stack(target_stack).to(device=self.device, dtype=dtype)
