@@ -103,8 +103,6 @@ def eval(model: nn.RNN,
         
         final = torch.cat(preds_total).to(device=model.device, dtype=torch.float32).flatten(0, 1)
         split = torch.split(final, 1, dim=1)
-        print(final.shape, dataset.window_train.shape[0] * dataset.window_train.shape[1], split[0].shape, len(split))
-        print(split[0])
     return split[0].squeeze(1).detach().cpu().numpy(), split[1].squeeze(1).detach().cpu().numpy()
         
 
