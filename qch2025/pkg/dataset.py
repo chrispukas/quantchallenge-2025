@@ -11,6 +11,8 @@ class DS(Dataset):
                  window_steps: int,
                  eval: bool = False,
                  extension_path: str = None,
+                 mean_override=None,
+                 std_override=None,
                  device: torch.device=torch.device("cuda"),
                  dtype: torch.dtype=torch.float16) -> None:
         
@@ -26,7 +28,7 @@ class DS(Dataset):
 
         if eval and extension_path:
             self.extension_size = window_size*2
-            df_extend = pd.read_csv(extension_path, index_col=False).drop(["time"], axis=1)
+            df_extend = pd.read_csv(extension_path, index_col=False).drop(["time", "Y1", "Y2"], axis=1)
             r = len(df_extend["A"])
             l = r-self.extension_size
             extra = df_extend.iloc[l:r]
@@ -42,18 +44,43 @@ class DS(Dataset):
 
         features_to_extend = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N"]
         for feature in features_to_extend:
-            params = [f"{feature}_diff", f"{feature}_pos", f"{feature}_neg"]
+            params = [f"{feature}_diff", f"{feature}_dir", f"{feature}_sma5", f"{feature}_vol5",
+                      f"{feature}_ret", f"{feature}_sign",
+                      f"{feature}_sma20", f"{feature}_vol20",
+                      f"{feature}_zscore5",
+                      f"{feature}_lag1", f"{feature}_lag2", f"{feature}_lag5"]
             self.df[f"{feature}_diff"] = self.df[feature].diff().fillna(0)
             
-            self.df[f"{feature}_pos"] = (self.df[feature] > 0).astype(int)
-            self.df[f"{feature}_neg"] = (self.df[feature] < 0).astype(int)
+            self.df[f"{feature}_sma5"] = self.df[feature].rolling(5).mean().fillna(0)
+            self.df[f"{feature}_vol5"] = self.df[feature].rolling(5).std().fillna(0)
+
+            self.df[f"{feature}_ret"] = self.df[feature].pct_change().fillna(0)
+
+            self.df[f"{feature}_sign"] = np.where(self.df[feature] > 0, 1, -1)
+            self.df[f"{feature}_dir"] = np.where(self.df[f"{feature}_ret"] > 0, 1, -1)
+
+            self.df[f"{feature}_zscore5"] = (
+                (self.df[feature] - self.df[f"{feature}_sma5"]) / (self.df[f"{feature}_vol5"].replace(0,1))
+            )
+
+
+            self.df[f"{feature}_sma20"] = self.df[feature].rolling(20).mean().fillna(0)
+            self.df[f"{feature}_vol20"] = self.df[feature].rolling(20).std().fillna(0)
+
+            self.df[f"{feature}_lag1"] = self.df[feature].shift(1).fillna(0)
+            self.df[f"{feature}_lag2"] = self.df[feature].shift(2).fillna(0)
+            self.df[f"{feature}_lag5"] = self.df[feature].shift(5).fillna(0)
 
             self.all_cols.extend(params)
-            self.cols_to_normalize.append(f"{feature}_diff")
+            self.cols_to_normalize.extend([f"{feature}_diff", f"{feature}_ret", f"{feature}_vol5", f"{feature}_vol20",
+                                           f"{feature}_zscore5",])
 
         # Feature normailzation
-        self.mean = self.df[self.cols_to_normalize].mean(skipna=True)
-        self.std = self.df[self.cols_to_normalize].std().replace(0, 1)
+        self.mean = self.df[self.cols_to_normalize].mean(skipna=True) if mean_override is None else mean_override
+        self.std = self.df[self.cols_to_normalize].std().replace(0, 1) if std_override is None else std_override
+
+        if mean_override is not None:
+            print(f"Overrided mean to: {mean_override}, and std to: {std_override}")
 
         self.entries = self.df.copy(deep=True)
         self.entries[self.cols_to_normalize] = (self.df[self.cols_to_normalize] - self.mean) / self.std # Normalizes the dataset
@@ -64,9 +91,6 @@ class DS(Dataset):
             cols = self.entries.columns
             if "id" in cols:
                 self.ids = torch.tensor(self.entries["id"]).to(self.device, dtype=dtype)
-
-                self.features = torch.tensor(self.entries.drop(["id"], axis = 1)\
-                                  .values.astype(np.float32)).to(self.device, dtype=dtype)
             else:
                 self.entries = self.entries.drop(['Y1', 'Y2'], axis=1)
 
@@ -74,8 +98,10 @@ class DS(Dataset):
                 self.entries[un] = self.entries[un] + 1
                 self.ids = torch.tensor(self.entries[un]).to(self.device, dtype=dtype)
 
-                self.features = torch.tensor(self.entries.drop([un], axis = 1)\
-                                  .values.astype(np.float32)).to(self.device, dtype=dtype)
+            self.entries = self.entries.drop(["id", "Unnamed: 0"], axis=1)
+            self.features = torch.tensor(self.entries.values.astype(np.float32)).to(self.device, dtype=dtype)
+                
+            print(list(self.entries.columns))
 
             self.max_padding = 0
             feature_stack = []

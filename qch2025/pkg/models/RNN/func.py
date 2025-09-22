@@ -48,7 +48,7 @@ def train(model: nn.RNN,
         torch.save({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
-        }, "/home/ubuntu/repos/quantchallenge-2025/weights/weights.pth")
+        }, f"/home/ubuntu/repos/quantchallenge-2025/weights/weights_{time.datetime.now()}_{loss.item()}.pth")
 
         if evaluate_dataset:
             model.eval()
