@@ -10,16 +10,31 @@ class DS(Dataset):
                  window_size: int,
                  window_steps: int,
                  eval: bool = False,
+                 extension_path: str = None,
                  device: torch.device=torch.device("cuda"),
                  dtype: torch.dtype=torch.float16) -> None:
         
         self.eval = eval
         self.device = device
+        self.extension_size = 0
 
         # Initialize the dataframes, extending the frame to take in all datasets
         self.df = pd.read_csv(dataset_path, index_col=False)
         self.df = self.df.drop(["time"], axis=1)
         print(self.df.columns)
+
+
+        if eval and extension_path:
+            self.extension_size = window_size*2
+            df_extend = pd.read_csv(extension_path, index_col=False).drop(["time"], axis=1)
+            r = len(df_extend["A"])
+            l = r-self.extension_size
+            extra = df_extend.iloc[l:r]
+
+            print(f"Extended dataframe by: {len(extra["A"])} items.")
+
+            self.df = pd.concat([extra, self.df], ignore_index=True)
+
         
         # Appl feature engineering to extend the state space
         self.cols_to_normalize = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "O", "P"]
@@ -62,6 +77,7 @@ class DS(Dataset):
                 self.features = torch.tensor(self.entries.drop([un], axis = 1)\
                                   .values.astype(np.float32)).to(self.device, dtype=dtype)
 
+            self.max_padding = 0
             feature_stack = []
             n = self.features.shape[0]
 
@@ -73,6 +89,8 @@ class DS(Dataset):
                     pad_len = r-n
                     pad_tr = tr_slice[-1:].repeat(pad_len, 1)
                     tr_slice = torch.cat([tr_slice, pad_tr], dim=0)
+
+                    self.max_padding = pad_len
                 
                 feature_stack.append(tr_slice)
 
@@ -96,9 +114,12 @@ class DS(Dataset):
         print(self.features.shape) # [points, features]
         print(self.y.shape) # [points, features]
 
+        self.max_padding = 0
+
         train_stack, target_stack = [], []
 
         n = self.features.shape[0]
+
         for l in range(0, n, window_steps): 
             r = l + window_size
             tr_slice = self.features[l:r, :]
@@ -112,6 +133,8 @@ class DS(Dataset):
 
                 tr_slice = torch.cat([tr_slice, pad_tr], dim=0)
                 y_slice = torch.cat([y_slice, pad_y], dim=0)
+                
+                self.max_padding = pad_len
             
             train_stack.append(tr_slice)
             target_stack.append(y_slice)

@@ -17,22 +17,22 @@ def train(model: nn.RNN,
           epochs: int = 5,
           batch_size: int = 32,
           decay: float = 0.1,
+          r2_epoch_usage: int = 10,
           learning_rate: float=0.001):
     rolling_mean: list[int] = []
 
     model.train()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     cr = nn.MSELoss()
-    mx = 0
+    r_mean_tensor = torch.Tensor([0]).to(device=model.device, dtype=torch.float32)
     for ep in range(1, epochs+1):
-        model.zero_grad()
         loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True) # Each batch item is its own sliding window
         losses=[]
         t = time.datetime.now()
         for i, (tr, target) in enumerate(loader):
             pred_out = model.forward(tr)
             #loss = combined_loss(pred_out, target, alpha_decay=decay)
-            loss = cr(pred_out, target)
+            loss = cr(pred_out, target) + ((1-r_mean_tensor) * decay) * int(r2_epoch_usage >= ep)
             
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 3)
@@ -51,7 +51,10 @@ def train(model: nn.RNN,
         }, "/home/ubuntu/repos/quantchallenge-2025/weights/weights.pth")
 
         if evaluate_dataset:
+            model.eval()
             r1, r2, r_mean = eval_traintime(model=model, dataset=evaluate_dataset, batch_size=2)
+            r_mean_tensor = torch.Tensor([r_mean]).to(device=model.device, dtype=torch.float32)
+            model.train()
             rolling_mean.append(r_mean)
             print(f"{ep}: R2_1: {r1}, R2_2: {r2}, R2_mean: {r_mean}")
             
@@ -89,11 +92,9 @@ def eval_traintime(model: nn.RNN,
     y1_p, y2_p = eval(model=model,
                   dataset=dataset,
                   batch_size=batch_size)
-    y1_t, y2_t = dataset.df["Y1"], dataset.df["Y2"]
 
-    m_l = len(y1_t)
-    y1_p = y1_p[:m_l]
-    y2_p = y2_p[:m_l]
+
+    y1_t, y2_t = dataset.df["Y1"][dataset.extension_size:], dataset.df["Y2"][dataset.extension_size:]
 
     r1 = r2_score(y1_t, y1_p)
     r2 = r2_score(y2_t, y2_p)
@@ -116,7 +117,17 @@ def eval(model: nn.RNN,
         
         final = torch.cat(preds_total).to(device=model.device, dtype=torch.float32).flatten(0, 1)
         split = torch.split(final, 1, dim=1)
-    return split[0].squeeze(1).detach().cpu().numpy(), split[1].squeeze(1).detach().cpu().numpy()
+    y1_np = split[0].squeeze(1).detach().cpu().numpy()[dataset.extension_size:]
+    y2_np = split[1].squeeze(1).detach().cpu().numpy()[dataset.extension_size:]
+
+    ml = len(y1_np) - dataset.max_padding
+
+    y1_np = y1_np[:ml]
+    y2_np = y2_np[:ml]
+
+    print(y1_np.shape, y2_np.shape)
+
+    return y1_np, y2_np
         
 
 
