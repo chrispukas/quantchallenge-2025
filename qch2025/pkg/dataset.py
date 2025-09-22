@@ -7,7 +7,6 @@ from torch.utils.data import Dataset
 class DS(Dataset):
     def __init__(self, 
                  dataset_path: str,
-                 dataset_path_2: str,
                  window_size: int,
                  window_steps: int,
                  eval: bool = False,
@@ -18,10 +17,9 @@ class DS(Dataset):
         self.device = device
 
         # Initialize the dataframes, extending the frame to take in all datasets
-        self.df = pd.read_csv(dataset_path)
-        df2 = pd.read_csv(dataset_path_2)
-        self.df = pd.concat([self.df.drop(["time"], axis=1), df2.fillna(0)], axis=1)
-
+        self.df = pd.read_csv(dataset_path, index_col=False)
+        self.df = self.df.drop(["time"], axis=1)
+        print(self.df.columns)
         
         # Appl feature engineering to extend the state space
         self.cols_to_normalize = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "N", "O", "P"]
@@ -48,8 +46,20 @@ class DS(Dataset):
 
         # Feature evaluation mode, only copies features, not targets
         if eval:
-            self.ids = torch.tensor(self.entries["id"]).to(self.device, dtype=dtype)
-            self.features = torch.tensor(self.entries.drop(["id"], axis = 1)\
+            cols = self.entries.columns
+            if "id" in cols:
+                self.ids = torch.tensor(self.entries["id"]).to(self.device, dtype=dtype)
+
+                self.features = torch.tensor(self.entries.drop(["id"], axis = 1)\
+                                  .values.astype(np.float32)).to(self.device, dtype=dtype)
+            else:
+                self.entries = self.entries.drop(['Y1', 'Y2'], axis=1)
+
+                un = "Unnamed: 0"
+                self.entries[un] = self.entries[un] + 1
+                self.ids = torch.tensor(self.entries[un]).to(self.device, dtype=dtype)
+
+                self.features = torch.tensor(self.entries.drop([un], axis = 1)\
                                   .values.astype(np.float32)).to(self.device, dtype=dtype)
 
             feature_stack = []
@@ -68,9 +78,13 @@ class DS(Dataset):
 
             self.window_features = torch.stack(feature_stack).to(device=self.device, dtype=dtype)
             return
+
+        self.entries = self.entries.drop(["Unnamed: 0"], axis=1)
         
         self.entries["Y1"] = self.df["Y1"]
         self.entries["Y2"] = self.df["Y2"]
+
+        print(self.entries.columns)
 
         self.features = torch.tensor(self.entries.drop(['Y1', "Y2"], axis = 1)\
                                   .values.astype(np.float32)).to(self.device, dtype=dtype)
@@ -84,7 +98,8 @@ class DS(Dataset):
 
         train_stack, target_stack = [], []
 
-        for l in range(0, self.features.shape[0], window_steps): 
+        n = self.features.shape[0]
+        for l in range(0, n, window_steps): 
             r = l + window_size
             tr_slice = self.features[l:r, :]
             y_slice = self.y[l:r, :]

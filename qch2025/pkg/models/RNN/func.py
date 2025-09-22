@@ -91,6 +91,10 @@ def eval_traintime(model: nn.RNN,
                   batch_size=batch_size)
     y1_t, y2_t = dataset.df["Y1"], dataset.df["Y2"]
 
+    m_l = len(y1_t)
+    y1_p = y1_p[:m_l]
+    y2_p = y2_p[:m_l]
+
     r1 = r2_score(y1_t, y1_p)
     r2 = r2_score(y2_t, y2_p)
 

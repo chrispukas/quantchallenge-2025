@@ -15,7 +15,7 @@ class RNN(nn.Module):
         super(RNN, self).__init__()
         self.lstm = nn.LSTM(input_size, 
                             hidden_size=hidden_size, 
-                            num_layers=lstm_dropout, 
+                            num_layers=lstm_layers, 
                             dropout=lstm_dropout, 
                             bidirectional=True, 
                             batch_first=True).to(device=device, dtype=dtype)
