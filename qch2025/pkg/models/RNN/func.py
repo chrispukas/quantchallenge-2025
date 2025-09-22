@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import datetime as time
-#from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score
 
 import numpy as np
 
@@ -12,7 +12,8 @@ from qch2025.pkg.dataset import DS
 
 
 def train(model: nn.RNN,
-          dataset: DS,
+          train_dataset: DS,
+          evaluate_dataset: DS,
           epochs: int = 5,
           batch_size: int = 32,
           decay: float = 0.1,
@@ -25,7 +26,7 @@ def train(model: nn.RNN,
     mx = 0
     for ep in range(1, epochs+1):
         model.zero_grad()
-        loader = DataLoader(dataset, batch_size=batch_size, shuffle=True) # Each batch item is its own sliding window
+        loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True) # Each batch item is its own sliding window
         losses=[]
         t = time.datetime.now()
         for i, (tr, target) in enumerate(loader):
@@ -49,19 +50,11 @@ def train(model: nn.RNN,
             'optimizer_state_dict': optimizer.state_dict(),
         }, "/home/ubuntu/repos/quantchallenge-2025/weights/weights.pth")
 
-        """
-            rsq, acc = check_training(model, dataset)
-            if rsq > mx and ep > 3:
-                print(f"Saving checkpoint: best rsq: {rsq} vs current: {m}")
-                torch.save({
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                }, "/home/ubuntu/repos/quantchallenge-2025/weights/weights.pth")
-                # Only save weights with best rsq
-                mx = max(mx, rsq)
-            rolling_mean.append(rsq)
-        """
-
+        if evaluate_dataset:
+            r1, r2, r_mean = eval_traintime(model=model, dataset=evaluate_dataset, batch_size=2)
+            rolling_mean.append(r_mean)
+            print(f"{ep}: R2_1: {r1}, R2_2: {r2}, R2_mean: {r_mean}")
+            
         print(f"{ep}: AVG OVERALL LOSS: {np.mean(np.array(losses))}, FINAL LOSS: {losses[-1]}, SMALLEST LOSS {min(losses)}, LARGEST LOSS: {max(losses)}")
     return rolling_mean   
 
@@ -89,6 +82,22 @@ def check_training(model: nn.RNN, dataset: DS):
     return (r1+r2)/2, acc
 
 
+
+def eval_traintime(model: nn.RNN,
+                   dataset: DS,
+                   batch_size: int=1):
+    y1_p, y2_p = eval(model=model,
+                  dataset=dataset,
+                  batch_size=batch_size)
+    y1_t, y2_t = dataset.df["Y1"], dataset.df["Y2"]
+
+    r1 = r2_score(y1_t, y1_p)
+    r2 = r2_score(y2_t, y2_p)
+
+    return r1, r2, (r1+r2)/2
+    
+    
+    
 
 
 def eval(model: nn.RNN,
