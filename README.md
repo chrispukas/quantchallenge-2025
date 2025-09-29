@@ -1,27 +1,22 @@
-# QuantChallenge Starter Repo
+# 1.1 Submission for the QuantChallenge.org 2025 competiton
 
-This is the starter repo to help you get started with QuantChallenge 2025.
+The competition consisted of 2 components (Research, and Trading) over a 7 day period. This repo contains the submission code for both componenets, and below is an outline of the function of each repo.
 
-## Sylvian Extension
+This package can be installed by doing the following (MacOS/Linux):
+```
+git clone https://github.com/chrispukas/quantchallenge-2025.git;
+cd ./quantchallenge-2025; bash install.sh;
+```
 
-Make sure you have installed the [Sylvian extension](https://marketplace.visualstudio.com/items?itemName=SylvianAI.sylvian) and initialized it. **This is required to be eligible for prizes!**
-1. Go to the command palette (⇧⌘P on Mac, Ctrl + Shift + P otherwise)
-2. Search for 'Sylvian: Initialize Sylvian'
-3. Enter the email you used for the competition
+Notebooks can be found in the following repo: ```/Users/apple/Documents/github/quantchallenge-2025/scripts/notebooks```
 
-If done correctly, your .competition file should include `email=your_email_here`. **DO NOT EDIT THIS .competition FILE**!
+## 2.1. Research
 
-After having worked in your repository for a little, you should be able to go to quantchallenge.org > Dashboard > Settings and see that the extension is active. If it is not active, please contact support in the Discord!
+Implementation of a hybrid attention + LSTM architecture to determine long and short range temporal time-series datapoints, predicting future outcomes. Feature engineering was used to expand the feature-space (momentums, differences, rolling mean, etc). This implementation can be found in the following path:```./qch2025/pkg/research/models/```
 
-## Directories
+## 2.2. Trading
 
-This repo consists of two folders: /research and /trading.
+Implementation of a hybrid double-regression regression architecture, with 1 fixed layer, trained on previous game states, and another dynamic layer, with online training to determine unique game dependencies based on a rolling window. ```./qch2025/pkg/trading``` 
 
-### 1. Research
-The `research` folder contains a IPython notebook `research_starter.ipynb` that helps you get started on the datasets and how to format predictions for submission.
 
-### 2. Trading
-The `trading` folder contains both a C++ and Python template for trading algorithm to be used in the live trading portion of QuantChallenge 2025. For low-latency strategies, we recommend using C++ for a slight performance bump.
-
-## Questions
-If you have any lingering questions, reach out for support on Discord or email info@quantchallenge.org
+![Alt text](/res/img/Screenshot%202025-09-29%20at%2011.30.58.png)
