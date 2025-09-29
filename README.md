@@ -10,6 +10,13 @@ cd ./quantchallenge-2025; bash install.sh;
 
 Notebooks can be found in the following repo: ```/Users/apple/Documents/github/quantchallenge-2025/scripts/notebooks```
 
+
+
+
+![Alt text](/res/img/Screenshot%202025-09-29%20at%2011.30.58.png)
+
+
+
 ## 2.1. Research
 
 Implementation of a hybrid attention + LSTM architecture to determine long and short range temporal time-series datapoints, predicting future outcomes. Feature engineering was used to expand the feature-space (momentums, differences, rolling mean, etc). This implementation can be found in the following path:```./qch2025/pkg/research/models/```
@@ -17,6 +24,3 @@ Implementation of a hybrid attention + LSTM architecture to determine long and s
 ## 2.2. Trading
 
 Implementation of a hybrid double-regression regression architecture, with 1 fixed layer, trained on previous game states, and another dynamic layer, with online training to determine unique game dependencies based on a rolling window. ```./qch2025/pkg/trading``` 
-
-
-![Alt text](/res/img/Screenshot%202025-09-29%20at%2011.30.58.png)
